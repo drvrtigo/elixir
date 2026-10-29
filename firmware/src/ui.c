@@ -120,6 +120,14 @@ static void bar_copy(pattern_t *p, uint32_t t, uint32_t from, uint32_t to, int a
 /* a step key: the step on / off (a generator's track: its live copy too, the step as the pattern has it) */
 static void step_toggle(pattern_t *p, uint32_t t, uint32_t s)
 {
+    uint32_t f = irq_save();
+    if (eb_preview_on(p, t)) {
+        p = eb_preview_edit(p, t);
+        main_set(p, t, s, !main_on(p, t, s));
+        irq_restore(f);
+        return;
+    }
+    irq_restore(f);
     int on = !main_on(p, t, s);
     main_set(p, t, s, on);
     if (p == &pat[sq.active] && gen_live(p, t)) {
@@ -335,7 +343,7 @@ static const uint8_t GEN_ORDER[NGEN] = {GEN_OFF, GEN_EUCLID, GEN_MUTATE, GEN_TUR
 static uint32_t gen_acts(const pattern_t *p, uint32_t t, uint8_t out[NGACT])
 {
     uint32_t n = 0, g = p->gen[t][0];
-    int live = gen_live(p, t) || mel_on(p, t);
+    int live = gen_live(p, t) || mel_on(p, t) || eb_preview_on(p, t);
     if (g == GEN_EUCLID)
         out[n++] = ACT_DICE;
     if (live)
@@ -517,7 +525,7 @@ static uint32_t link_start(const uint8_t *L)
 static const pattern_t *view_pat(uint32_t t)
 {
     const pattern_t *p = shown_pat();
-    return p == &pat[sq.active] && gen_live(p, t) ? &gpat : p;
+    return p == &pat[sq.active] && (gen_live(p, t) || eb_preview_on(p, t)) ? &gpat : p;
 }
 static uint32_t vp_max(uint32_t p);
 /* 0.9: the kit browser's entries: the 64 slots, or (0.9.2: KNOB 1, ui.kb_lib) the library's kits that exist */
@@ -574,7 +582,12 @@ static void bank_fix(void)
     if (ui_banks() && ui.bank >= ui_banks())
         ui.bank = 0;
 }
-static step_t *sel_step(void) { return &shown_pat()->step[ui.track][ui.step & 63u]; }
+#include "gen/beat_preview_ui.h"
+
+static step_t *sel_step(void)
+{
+    return &eb_preview_edit(shown_pat(), ui.track)->step[ui.track][ui.step & 63u];
+}
 static uint32_t vp_min(uint32_t p);
 static uint32_t vp_max(uint32_t p);
 static const char *const FX_P_NAME[NFX][4] = {
@@ -657,6 +670,8 @@ static void glfo_macros(void)
 static uint32_t vp_get(uint32_t p)
 {
     pattern_t *pt = shown_pat();
+    if (eb_preview_step_param(p))
+        pt = eb_preview_edit(pt, ui.track);
     switch (p) {
     case PAR_TRACK_LENGTH: return track_len(pt, ui.track);
     case PAR_STEP_VOLUME: return sel_step()->volume & STEP_VOLUME_MASK;
@@ -919,9 +934,11 @@ static uint32_t vp_max(uint32_t p)
 
 static void palette_apply(void) { palette_set(kset.palette % NPALETTES); }
 
-static void vp_set(uint32_t p, uint32_t v)
+static void vp_set_native(uint32_t p, uint32_t v)
 {
     pattern_t *pt = shown_pat();
+    if (eb_preview_step_param(p))
+        pt = eb_preview_edit(pt, ui.track);
     switch (p) {
     case PAR_TRACK_LENGTH:
         pt->len[ui.track] = (uint8_t)v;
@@ -1231,6 +1248,27 @@ static void vp_set(uint32_t p, uint32_t v)
     }
 }
 
+static void vp_set(uint32_t p, uint32_t v)
+{
+    if (eb_preview_step_param(p) || eb_preview_track_param(p)) {
+        uint32_t f = irq_save();
+        if (eb_preview_track_param(p)) {
+            if (p == PAR_TRACK_LENGTH && ui.mode == M_LAST && ui.last_all) {
+                uint32_t t;
+                for (t = 0; t < NTRACK; t++)
+                    eb_preview_discard(t);
+            } else {
+                eb_preview_discard(ui.track);
+            }
+        }
+        vp_set_native(p, v);
+        irq_restore(f);
+        return;
+    }
+    vp_set_native(p, v);
+}
+
+
 /* ------------------------------------------------------ control all --- */
 /* 0.11: Control All (Elektron's): OCT+ held on a sound page, a knob moves its parameter on every voice that has it,
  * by the knob's steps from each voice's own value (clamped), so the voices keep their differences. The first turn
@@ -1344,7 +1382,8 @@ static void knob_turn(uint32_t k, int32_t n)
     }
     /* a step key held: that step's lock (sequencer automation), in the lane that has the parameter or is free */
     if (ui.held_step >= 0 && par_lockable(p) && ui.mode != M_STEP) {
-        pattern_t *pt = shown_pat();
+        uint32_t f = irq_save();
+        pattern_t *pt = eb_preview_edit(shown_pat(), ui.track);
         step_t *s = &pt->step[ui.track][ui.held_step];
         uint32_t dest = par_to_autodest(p), lane = sq.lane, hs = (uint32_t)ui.held_step;
         uint32_t d1 = lock_get(pt, ui.track, hs, 0), d2 = lock_get(pt, ui.track, hs, 1);
@@ -1364,6 +1403,7 @@ static void knob_turn(uint32_t k, int32_t n)
         main_set(pt, ui.track, (uint32_t)ui.held_step, 1);
         live_step_sync(pt, ui.track, (uint32_t)ui.held_step);
         ui.lock_turned = 1;
+        irq_restore(f);
         return;
     }
     v = sync_knob(p) ? sync_detent(vp_get(p), n) : clamp32((int32_t)vp_get(p) + step, (int32_t)mn, (int32_t)mx);
@@ -1867,6 +1907,8 @@ static void white_down(uint32_t w)
                 ui.copy_src = (uint8_t)(n + 1u);
                 ui_message("COPY: PICK THE TARGET");
             } else {
+                if (n == sq.active)
+                    eb_context_changed();
                 pat[n] = pat[ui.copy_src - 1u];
                 if (n == sq.active)
                     pat_backup = pat[n];
@@ -2020,6 +2062,8 @@ static void black_down(uint32_t k)
 static void seq_copy_track(uint32_t src, uint32_t dst, pattern_t *p)   /* seq_copyTrack */
 {
     uint32_t k;
+    if (p == &pat[sq.active])
+        eb_preview_discard(dst);
     for (k = 0; k < NUM_STEPS; k++) {
         p->step[dst][k] = p->step[src][k];
         p->timing[dst][k] = p->timing[src][k];
@@ -2041,6 +2085,8 @@ static void seq_copy_track(uint32_t src, uint32_t dst, pattern_t *p)   /* seq_co
 static void bar_copy(pattern_t *p, uint32_t t, uint32_t from, uint32_t to, int all)
 {
     uint32_t i, a = from * 16u, b = to * 16u, len = track_len(p, t);
+    if (p == &pat[sq.active])
+        eb_preview_discard(t);
     for (i = 0; i < 16u; i++) {
         p->step[t][b + i] = p->step[t][a + i];
         p->timing[t][b + i] = p->timing[t][a + i];
@@ -2124,11 +2170,13 @@ static void button_down(uint32_t b)
             switch (ui.action) {
             case ACT_DICE: seq_dice(ui.track); break;
             case ACT_COMMIT:
-                ok = gen_live(shown_pat(), ui.track) || mel_on(shown_pat(), ui.track);
+                ok = gen_live(shown_pat(), ui.track) || mel_on(shown_pat(), ui.track) ||
+                     eb_preview_on(shown_pat(), ui.track);
                 seq_commit(ui.track);
                 break;
             case ACT_UNDO: ok = seq_undo(ui.track); break;
             default:                                 /* (RESET; 20: a melody new from its start) */
+                eb_preview_discard(ui.track);
                 memset(sq.mfull[ui.track], 0, sizeof sq.mfull[ui.track]);
                 sq.mmok &= (uint8_t)~(1u << ui.track);
                 sq.gsync |= (uint8_t)(1u << ui.track);
@@ -2566,7 +2614,9 @@ static int ui_step_note_edit(uint32_t note)
 {
     if (ui.mode != M_STEP)
         return 0;
+    uint32_t f = irq_save();
     sel_step()->note = (uint8_t)note;
     live_step_sync(shown_pat(), ui.track, ui.step & 63u);
+    irq_restore(f);
     return 1;
 }

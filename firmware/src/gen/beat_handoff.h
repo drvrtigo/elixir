@@ -4,7 +4,7 @@
 
 /* Main-loop producer, audio-ISR consumer; not a core-1 interface.
  * Include after pattern_t, sq, track_len and melody constants exist.
- * This stage accepts into a private buffer. It does not select playback.
+ * Completed requests also publish to the transient preview owner.
  */
 static uint32_t irq_save(void);
 static void irq_restore(uint32_t f);
@@ -130,7 +130,10 @@ static void eb_handoff_service(void)
     eb_handoff_read(&eb_ho.probe, p, t);
     if (memcmp(&eb_ho.before, &eb_ho.probe, sizeof eb_ho.before))
         goto reject;
-    memcpy(&eb_ho.accepted, &eb_ho.before, sizeof eb_ho.accepted);
+    if (eb_preview_on(p, t))
+        eb_handoff_read(&eb_ho.accepted, &gpat, t);
+    else
+        memcpy(&eb_ho.accepted, &eb_ho.before, sizeof eb_ho.accepted);
     n = track_len(p, t);
     for (k = 0; k < n; k++) {
         uint16_t bit = (uint16_t)(1u << (k & 15u));
@@ -143,6 +146,7 @@ static void eb_handoff_service(void)
     }
     RING_PUBLISH();
     eb_ho.state = EB_HO_ACCEPTED;
+    eb_preview_accept();
     return;
 reject:
     RING_PUBLISH();

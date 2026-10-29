@@ -1104,7 +1104,7 @@ static void draw_config_help(int32_t y0)
 static void draw_sound(int32_t y0)
 {
     uint32_t k, h;
-    const pattern_t *pt = shown_pat();
+    const pattern_t *pt = view_pat(ui.track);
     (void)y0;
     for (h = 0; h < 2u; h++)
         for (k = 0; k < 4u; k++) {
@@ -1144,7 +1144,7 @@ static uint32_t sound_sig(void)
                                          (uint32_t)mdl[0].type << 10 | (uint32_t)mdl[1].type << 16 |
                                          (uint32_t)mdl[2].type << 22);
     s = sig_add(s, (uint32_t)mi[track_voice(ui.track)].type);   /* (24: MICRO's knobs) */
-    const pattern_t *pt = shown_pat();
+    const pattern_t *pt = view_pat(ui.track);
     for (h = 0; h < 2u; h++)
         for (k = 0; k < 4u; k++) {
             uint32_t p = sect_par(ui.track, ui.sect, h, k);
@@ -1349,7 +1349,7 @@ static void card_name(char *b, uint32_t n, uint32_t p)
     case VP_DJ: put_str(b, "DJ filter", n); return;
     case VP_COND: put_str(b, "Condition", n); return;
     case VP_RAT_N: put_str(b, "Hits", n); return;
-    case VP_RAT_RATE: put_str(b, shown_pat()->rat[ui.track][ui.step & 63u] & RAT_BOUNCE ? "Curve" : "Rate", n); return;
+    case VP_RAT_RATE: put_str(b, view_pat(ui.track)->rat[ui.track][ui.step & 63u] & RAT_BOUNCE ? "Curve" : "Rate", n); return;
     case VP_RAT_SHAPE: put_str(b, "Shape", n); return;
     case VP_BSTART: put_str(b, "Bounce", n); return;
     case VP_BPITCH: put_str(b, "Bnc pitch", n); return;
@@ -1676,12 +1676,12 @@ static void card_value(char *b, uint32_t n, uint32_t p, uint32_t v)
         if (!v)
             put_str(b, "OFF", n);
         else
-            put_int(b, shown_pat()->rat[ui.track][ui.step & 63u] & RAT_BOUNCE ? BNC_HITS[v & 7u] : (int32_t)v + 1);
+            put_int(b, view_pat(ui.track)->rat[ui.track][ui.step & 63u] & RAT_BOUNCE ? BNC_HITS[v & 7u] : (int32_t)v + 1);
         return;
     case VP_RAT_RATE: {
         static const char *const R[4] = {"1/32", "1/48", "1/64", "1/24"};
         static const char *const C[4] = {"BALL", "TIGHT", "SLOW", "DRUNK"};
-        put_str(b, shown_pat()->rat[ui.track][ui.step & 63u] & RAT_BOUNCE ? C[v & 3u] : R[v & 3u], n);
+        put_str(b, view_pat(ui.track)->rat[ui.track][ui.step & 63u] & RAT_BOUNCE ? C[v & 3u] : R[v & 3u], n);
         return;
     }
     case VP_RAT_SHAPE: put_str(b, v ? "BOUNCE" : "EVEN", n); return;
@@ -1865,7 +1865,7 @@ static void draw_card(uint32_t k, uint32_t p)
     s = sig_add(s, hot | lock << 1 | fx.type << 2 | ui.mode << 8);
     s = sig_add(s, ui.msel | (uint32_t)pfs.m[p >= VP_M1 && p <= VP_M4 ? p - VP_M1 : ui.msel & 3u].par << 4 |
                        (uint32_t)shown_pat()->gen[ui.track][0] << 20 |
-                       (uint32_t)(shown_pat()->rat[ui.track][ui.step & 63u] & RAT_BOUNCE) << 21);
+                       (uint32_t)(view_pat(ui.track)->rat[ui.track][ui.step & 63u] & RAT_BOUNCE) << 21);
     if (!region(R_CARD0 + k, s))
         return;
     card_name(nm, sizeof nm, p);

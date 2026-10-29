@@ -49,6 +49,12 @@ typedef struct {
                                                   * it (bit t) */
     uint8_t mel[NTRACK][8];                      /* 20: the track's melody (ML_*: MEL_* and its settings) */
 } pattern_t;
+
+/* Transient STYLE preview; implementations follow the handoff definition. */
+static int eb_preview_on(const pattern_t *p, uint32_t t);
+static pattern_t *eb_preview_edit(pattern_t *p, uint32_t t);
+static int eb_preview_discard(uint32_t t);
+static void eb_preview_accept(void);
 #define NLINK 8u
 
 /* the tracks' clocks (0.5): ticks a step, slowest to fastest; 1x the LXR's 24 */
@@ -299,6 +305,8 @@ static void step_reset(step_t *s)                    /* seq_resetNote */
 static void seq_clear_track(uint32_t t, pattern_t *p)   /* seq_clearTrack */
 {
     uint32_t k;
+    if (p == &pat[sq.active])
+        eb_preview_discard(t);
     for (k = 0; k < NUM_STEPS; k++) {
         step_reset(&p->step[t][k]);
         p->timing[t][k] = 7u << 4;                   /* no flam, shift 0 */
@@ -344,6 +352,8 @@ static int pat_blank(const pattern_t *p)             /* nothing on and no genera
 static void seq_clear_automation(uint32_t t, pattern_t *p, uint32_t lane)
 {
     uint32_t k;
+    if (p == &pat[sq.active])
+        eb_preview_discard(t);
     for (k = 0; k < NUM_STEPS; k++) {
         lock_set(p, t, k, lane, NO_AUTOMATION);
         if (lane == 0u)
@@ -498,7 +508,7 @@ enum { POS_PREV, POS_CUR, POS_NEXT };
 static pattern_t *tpat(uint32_t t)
 {
     pattern_t *p = &pat[sq.active];
-    return gen_live(p, t) ? &gpat : p;
+    return gen_live(p, t) || eb_preview_on(p, t) ? &gpat : p;
 }
 static uint32_t trk_ticks(uint32_t t)                /* ticks a step of track t */
 {
@@ -1216,6 +1226,8 @@ static void seq_add_note(uint32_t t, uint32_t vel, uint32_t note);
  * length): its live copy, which is what plays, takes them too; whether it plays stays the generator's */
 static void live_step_sync(const pattern_t *p, uint32_t t, uint32_t s)
 {
+    if (eb_preview_on(p, t))
+        return;
     if (p != &pat[sq.active] || !gen_live(p, t) || t >= NTRACK || s >= NUM_STEPS)
         return;
     gpat.step[t][s] = p->step[t][s];
@@ -1242,6 +1254,7 @@ static void trk_copy(pattern_t *d, const pattern_t *s, uint32_t t)
     memcpy(d->mel[t], s->mel[t], sizeof d->mel[t]);
 }
 #include "gen/beat_handoff.h"
+#include "gen/beat_preview.h"
 
 static void seq_gen_sync(uint32_t t);
 static void seq_reset_tracks(void)                   /* every track before its first step, its counts from 0 */
@@ -1592,6 +1605,7 @@ static void seq_clock_out_tick(void)
 static void seq_gen_syncs(void);
 static void seq_block(void)
 {
+    eb_preview_poll();
     if (sq.gsync)                                    /* (the generators' live tracks the panel reset) */
         seq_gen_syncs();
     eb_handoff_service();                          /* prepared rhythm: validate after native generator sync */
@@ -1707,12 +1721,15 @@ static void seq_record_automation(uint32_t t, uint32_t param, uint32_t val)
     if (sq.armed_step >= 0 && sq.armed_track >= 0) {
         pattern_t *p = &pat[ui_pattern()];
         uint32_t at = (uint32_t)sq.armed_track, k = (uint32_t)sq.armed_step;
+        uint32_t f = irq_save();
+        p = eb_preview_edit(p, at);
         lock_set(p, at, k, sq.lane, dest);
         if (sq.lane == 0u)
             p->step[at][k].p1v = (uint8_t)val;
         else
             p->step[at][k].p2v = (uint8_t)val;
         live_step_sync(p, at, k);
+        irq_restore(f);
     }
 }
 
@@ -1842,6 +1859,8 @@ static void seq_gen_sync(uint32_t t)                 /* the live track from the 
 {
     const pattern_t *p = &pat[sq.active];
     uint32_t k;
+    if (eb_preview_on(p, t))
+        return;
     trk_copy(&gpat, p, t);
     mel_reset(t);
     memset(mel_n[t], 0, sizeof mel_n[t]);            /* (what played: COMMIT's, until then) */
@@ -1957,6 +1976,8 @@ static int seq_undo(uint32_t t)                      /* the track and its saved 
 {
     pattern_t *p = &pat[sq.active];
     uint8_t g[4], m[NML];
+    if (eb_preview_discard(t))
+        return 1;
     if (undo_t != (int8_t)t || undo_p != sq.active)
         return 0;
     memcpy(g, p->gen[t], 4);                         /* (the generator's settings stay as they are, the melody's) */
@@ -1975,6 +1996,8 @@ static void seq_commit(uint32_t t)                   /* COMMIT: the live track i
     pattern_t *p = &pat[sq.active];
     uint8_t g[4], m[NML];
     uint32_t k;
+    if (eb_preview_commit(t))
+        return;
     if (!gen_live(p, t) && !mel_on(p, t))
         return;
     seq_undo_save(t);
@@ -1997,6 +2020,7 @@ static void seq_dice(uint32_t t)
 {
     pattern_t *p = &pat[sq.active];
     uint32_t len = p->gen[t][1] ? p->gen[t][1] : 16u, n = p->gen[t][2], k;
+    eb_preview_discard(t);
     seq_undo_save(t);
     if (len > NUM_STEPS)
         len = NUM_STEPS;
@@ -2024,6 +2048,7 @@ static void seq_init(void)                           /* seq_init */
     uint32_t i, t;
     eb_context_changed();
     eb_handoff_init();
+    eb_preview_init();
     for (i = 0; i < NUM_SONGS; i++)
         for (t = 0; t < MAX_SONG_LENGTH; t++)
             songs[i][t] = SONG_END;
