@@ -28,3 +28,27 @@ Other parts:
 - The firmware package embeds JieLi AC79 SDK boot files under Apache-2.0 (`LICENSES/Apache-2.0.txt`).
 
 "Erica Synths" and "LXR-02" are trademarks of Erica Synths. "M-VAVE" and "FM-1" are trademarks of their owner. Elixir is an unofficial port, not affiliated with or endorsed by Erica Synths, M-VAVE or Hügelton Instruments.
+
+## Seeded rhythm generator imported from Hortator
+
+The files in firmware/src/gen/beat_gen.h,
+firmware/src/gen/jiant_beats.h and firmware/src/gen/beat_abstract.h
+were imported from drvrtigo/hortator-gen at commit
+ee8a2b1f9e8e3640220cc5caaa25ea8b012d481c.
+
+The imported files carry GPL-3.0-only licence identifiers.
+Their existing copyright and attribution notices are retained.
+
+jiant_beats.h contains a drum-map subset adapted from
+juanjiant-bit/JIANT, firmware/src/gen_tables.c:
+
+Copyright (C) 2026 Juan Ignacio Antonucci (Juan Jiant).
+Original source Git blob: 3a1e917592181dea59104907b36c4679ea108630.
+
+The density/variation adapter is not JIANT's complete gen_drums()
+implementation. The Interlock and Fracture generators are procedural
+algorithms, not transcriptions of an artist's compositions.
+
+The Elixir-specific adapter changes rhythm triggers and generated-hit
+velocities only. No Hortator sound engines, sound-generation UI, assets,
+or project-storage implementation are imported.
