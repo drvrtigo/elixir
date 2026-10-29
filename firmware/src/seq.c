@@ -15,6 +15,8 @@
  * clock out stays on the unshuffled grid, and the roll rates finer than 1/16 and the triplet ones (listed by the LXR,
  * all 1/16 there) play at their rate. */
 
+#include "gen/beat_context.h"
+
 #define NUM_PATTERN 32
 #define NUM_STEPS 64
 #define NUM_SONGS 64
@@ -1268,6 +1270,7 @@ static void seq_pattern_activate(void)               /* seq_setPendingPatternAct
 {
     uint32_t t;
     if (sq.active != sq.pending || sq.load_pending) {
+        eb_context_changed();
         seq_reset_tracks();
         sq.gsync = (1u << NTRACK) - 1u;              /* (the generators' live tracks from the new pattern) */
         sq.load_pending = 0;
@@ -2016,6 +2019,7 @@ static void seq_dice(uint32_t t)
 static void seq_init(void)                           /* seq_init */
 {
     uint32_t i, t;
+    eb_context_changed();
     for (i = 0; i < NUM_SONGS; i++)
         for (t = 0; t < MAX_SONG_LENGTH; t++)
             songs[i][t] = SONG_END;

@@ -732,6 +732,7 @@ static int proj_load(uint32_t l)
         if (~c != h.crc)
             return -3;
     }
+    eb_context_changed();
     rc = proj_read_payload(h.version);
     proj_after_load();
     return rc;
