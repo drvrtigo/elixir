@@ -1241,6 +1241,8 @@ static void trk_copy(pattern_t *d, const pattern_t *s, uint32_t t)
     d->sfollow = (uint8_t)((d->sfollow & ~(1u << t)) | (s->sfollow & (1u << t)));
     memcpy(d->mel[t], s->mel[t], sizeof d->mel[t]);
 }
+#include "gen/beat_handoff.h"
+
 static void seq_gen_sync(uint32_t t);
 static void seq_reset_tracks(void)                   /* every track before its first step, its counts from 0 */
 {
@@ -1592,6 +1594,7 @@ static void seq_block(void)
 {
     if (sq.gsync)                                    /* (the generators' live tracks the panel reset) */
         seq_gen_syncs();
+    eb_handoff_service();                          /* prepared rhythm: validate after native generator sync */
     if (!sq.sync_ext) {
         sq.acc_q16 += BLOCK * tape_q16;             /* (TAPE STOP slows the clock) */
         while (sq.acc_q16 >= sq.tick_q16) {          /* (the clock goes out stopped too, as the LXR's) */
@@ -2020,6 +2023,7 @@ static void seq_init(void)                           /* seq_init */
 {
     uint32_t i, t;
     eb_context_changed();
+    eb_handoff_init();
     for (i = 0; i < NUM_SONGS; i++)
         for (t = 0; t < MAX_SONG_LENGTH; t++)
             songs[i][t] = SONG_END;
