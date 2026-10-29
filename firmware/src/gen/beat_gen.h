@@ -5,7 +5,9 @@
 #ifndef HORTATOR_BEAT_GEN_H
 #define HORTATOR_BEAT_GEN_H
 #include <stdint.h>
+#ifndef BG_EXTERNAL_MEMORY_FUNCTIONS
 #include <string.h>
+#endif
 #define BG_LANES 8
 #define BG_STEPS 64
 #define BG_OFF 255u

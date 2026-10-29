@@ -2,9 +2,13 @@
 #ifndef ELIXIR_BEAT_STYLE_H
 #define ELIXIR_BEAT_STYLE_H
 
-#define BG_STORAGE POOL
+/* Elixir supplies its memory functions before this header. */
+#define BG_EXTERNAL_MEMORY_FUNCTIONS 1
+/* Main-loop generation scratch uses the existing RAM buffer section. */
+#define BG_STORAGE RAMBUF
 #include "beat_gen.h"
 #undef BG_STORAGE
+#undef BG_EXTERNAL_MEMORY_FUNCTIONS
 #include "beat_adapter.h"
 
 typedef struct {
@@ -14,7 +18,7 @@ typedef struct {
 
 static eb_style_config_t eb_style_config[NTRACK];
 static uint8_t eb_style_initialized;
-static bg_pattern_t eb_style_output POOL;
+static bg_pattern_t eb_style_output RAMBUF;
 static eb_handoff_rhythm_t eb_style_rhythm POOL;
 static const uint8_t EB_STYLE_PART[NTRACK] = {
     BG_KICK, BG_TOM, BG_CLAP, BG_SNARE, BG_COWBELL, BG_CH, BG_OH
