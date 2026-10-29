@@ -24,6 +24,7 @@ typedef struct {
 typedef struct {
     uint16_t main[4];
     uint8_t volume[NUM_STEPS];
+    uint8_t hit_volumes_only; /* 0: legacy full replacement; 1: preserve off-step volumes */
 } eb_handoff_rhythm_t;
 
 static struct {
@@ -96,7 +97,7 @@ static int eb_handoff_submit(const eb_handoff_rhythm_t *r)
         irq_restore(f);
         return 0;
     }
-    if (!r || !eb_context_matches(eb_ho.epoch) ||
+    if (!r || r->hit_volumes_only > 1u || !eb_context_matches(eb_ho.epoch) ||
         sq.active != eb_ho.pattern) {
         eb_ho.state = EB_HO_REJECTED;
         irq_restore(f);
@@ -142,7 +143,8 @@ static void eb_handoff_service(void)
             eb_ho.accepted.main[word] |= bit;
         else
             eb_ho.accepted.main[word] &= (uint16_t)~bit;
-        eb_ho.accepted.step[k].volume = eb_ho.rhythm.volume[k];
+        if (!eb_ho.rhythm.hit_volumes_only || (eb_ho.rhythm.main[word] & bit))
+            eb_ho.accepted.step[k].volume = eb_ho.rhythm.volume[k];
     }
     RING_PUBLISH();
     eb_ho.state = EB_HO_ACCEPTED;

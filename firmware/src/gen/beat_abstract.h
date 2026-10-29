@@ -6,7 +6,10 @@
 #define HORTATOR_BEAT_ABSTRACT_H
 typedef struct {uint8_t chaos,anchor,variation,prob;} bg_detail_t;
 static bg_detail_t bd={0,100,0,0};
-static bg_pattern_t bt_work; /* UI-only scratch: avoids a 2 KiB stack copy. */
+#ifndef BG_STORAGE
+#define BG_STORAGE
+#endif
+static bg_pattern_t bt_work BG_STORAGE; /* UI-only scratch: avoids a 2 KiB stack copy. */
 static uint32_t bt_random(const bg_settings_t *s,unsigned lane,unsigned step,unsigned kind)
 {
     uint32_t v=s->seed ^ ((lane+1u)*0x9E3779B9u) ^ ((step+1u)*0x85EBCA6Bu) ^

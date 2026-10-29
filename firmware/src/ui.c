@@ -53,7 +53,9 @@ enum { VP_BASE = 0x200, VP_NONE = VP_BASE, VP_IO_TYPE, VP_IO_SLOT, VP_NAME_POS, 
        VP_STCH, VP_STSIZE, VP_STLEN, VP_STVARY,      /* (0.16: STUTTER) */
        VP_MEL, VP_MEL_LAST = VP_MEL + NML - 1,       /* 20: the track's melody (pattern_t mel: ML_*) */
        VP_GL, VP_GL_LAST = VP_GL + NGLFO * NGLSET - 1,   /* 0.13: the global LFOs' settings (gls: NGLSET each) */
-       VP_P2, VP_P2_LAST = VP_P2 + 7 };
+       VP_P2, VP_P2_LAST = VP_P2 + 7,
+       VP_BSTYLE, VP_BPART, VP_BENERGY, VP_BSEED,
+       VP_BCOMPLEX, VP_BCHAOS, VP_BVAR, VP_BANCHOR };
 /* the ACTION page's action (OCT+ does it); 0.10: those of the track's generator (gen_acts) */
 enum { ACT_NONE, ACT_DICE, ACT_COMMIT, ACT_UNDO, ACT_RESET, NACT };
 
@@ -316,7 +318,9 @@ static int perf_bank2(void) { return ui.mode == M_PERF && ui.page % NPERF >= PG_
 /* 0.10: ARP's second set of pages: GENERATOR (the type, then its settings: page_params), ACTION (GRIDS: and the
  * map), TRACK, BOUNCE, LINKS, LINK SETUP. 19a: SCALE after TRACK (the pattern's root and scale, the track's
  * follow; TRACK has the follow too). 20: MELODY and MELODY: LOOP after ACTION */
-#define NEUCLID 9u
+#define NEUCLID 11u
+#define PG_BSTYLE 9u
+#define PG_BDETAIL 10u
 #define PG_GEN 0u
 #define PG_ACTION 1u
 #define PG_MELODY 2u
@@ -332,9 +336,12 @@ static const uint16_t P_EUCLID[NEUCLID][4] = {{VP_GMODE, VP_GA, VP_GB, VP_GC},
                                               {VP_SROOT, VP_SCALE, VP_SFOLLOW, VP_NONE},
                                               {VP_BSTART, VP_BPITCH, VP_NONE, VP_NONE},
                                               {VP_LINK, VP_LSTART, VP_LAMT, VP_DEPTH},
-                                              {VP_LWHEN, VP_LTGT, VP_LEFF, VP_LWIN}};
+                                              {VP_LWHEN, VP_LTGT, VP_LEFF, VP_LWIN},
+                                              {VP_BSTYLE, VP_BPART, VP_BENERGY, VP_BSEED},
+                                              {VP_BCOMPLEX, VP_BCHAOS, VP_BVAR, VP_BANCHOR}};
 static const char *const EUCLID_TITLE[NEUCLID] = {"GENERATOR", "ACTION", "MELODY", "MELODY: LOOP", "TRACK", "SCALE",
-                                                  "BOUNCE", "LINKS", "LINK SETUP"};
+                                                  "BOUNCE", "LINKS", "LINK SETUP",
+                                                  "STYLE: OCT GENERATE", "STYLE DETAIL: OCT"};
 /* the GENERATOR knob's order (KNOB 1: the value's index here) */
 static const uint8_t GEN_ORDER[NGEN] = {GEN_OFF, GEN_EUCLID, GEN_MUTATE, GEN_TURING, GEN_CA, GEN_GRIDS};
 /* the actions a track's generator has (the ACTION knob's 1..; 0: none): EUCLID's steps diced, a live generator's
@@ -583,6 +590,8 @@ static void bank_fix(void)
         ui.bank = 0;
 }
 #include "gen/beat_preview_ui.h"
+#include "gen/beat_style.h"
+#include "gen/beat_style_ui.h"
 
 static step_t *sel_step(void)
 {
@@ -673,6 +682,7 @@ static uint32_t vp_get(uint32_t p)
     if (eb_preview_step_param(p))
         pt = eb_preview_edit(pt, ui.track);
     switch (p) {
+    case VP_BSTYLE ... VP_BANCHOR: return eb_style_ui_get(p);
     case PAR_TRACK_LENGTH: return track_len(pt, ui.track);
     case PAR_STEP_VOLUME: return sel_step()->volume & STEP_VOLUME_MASK;
     case PAR_STEP_NOTE: return sel_step()->note & 127u;
@@ -828,6 +838,7 @@ static uint32_t vp_max(uint32_t p)
         return hi;
     }
     switch (p) {
+    case VP_BSTYLE ... VP_BANCHOR: return eb_style_ui_max(p);
     case PAR_TRACK_LENGTH: case PAR_EUKLID_LENGTH: return 64;
     case PAR_EUKLID_STEPS: return shown_pat()->gen[ui.track][1] ? shown_pat()->gen[ui.track][1] : 16u;
     case PAR_EUKLID_ROTATION: return (shown_pat()->gen[ui.track][1] ? shown_pat()->gen[ui.track][1] : 16u) - 1u;
@@ -940,6 +951,7 @@ static void vp_set_native(uint32_t p, uint32_t v)
     if (eb_preview_step_param(p))
         pt = eb_preview_edit(pt, ui.track);
     switch (p) {
+    case VP_BSTYLE ... VP_BANCHOR: eb_style_ui_set(p, v); return;
     case PAR_TRACK_LENGTH:
         pt->len[ui.track] = (uint8_t)v;
         if (ui.mode == M_LAST && ui.last_all) {
@@ -2161,6 +2173,11 @@ static void button_down(uint32_t b)
         if (ui.mode == M_SAVE || ui.mode == M_LOAD) {
             io_ok();
             ui.force = 1;
+            return;
+        }
+        if (ui.mode == M_EUCLID &&
+            (ui.page % NEUCLID == PG_BSTYLE || ui.page % NEUCLID == PG_BDETAIL)) {
+            eb_style_ui_generate();
             return;
         }
         if (ui.mode == M_EUCLID && ui.page % NEUCLID == PG_ACTION && ui.action) {   /* OCT+ does the ACTION */

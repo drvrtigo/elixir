@@ -1300,6 +1300,14 @@ static void card_name(char *b, uint32_t n, uint32_t p)
         return;
     }
     switch (p) {
+    case VP_BSTYLE: put_str(b, "Style", n); return;
+    case VP_BPART: put_str(b, "Part", n); return;
+    case VP_BENERGY: put_str(b, "Energy", n); return;
+    case VP_BSEED: put_str(b, "Seed", n); return;
+    case VP_BCOMPLEX: put_str(b, "Complex", n); return;
+    case VP_BCHAOS: put_str(b, "Chaos", n); return;
+    case VP_BVAR: put_str(b, "Vary", n); return;
+    case VP_BANCHOR: put_str(b, "Anchor", n); return;
     case VP_NONE: b[0] = 0; return;
     case VP_IO_TYPE: put_str(b, "Type", n); return;
     case VP_IO_SLOT: put_str(b, "Slot", n); return;
@@ -1507,7 +1515,14 @@ static void put_ms(char *b, uint32_t ms10)           /* a time: 0.9 ms, 12 ms, 1
 }
 static void card_value(char *b, uint32_t n, uint32_t p, uint32_t v)
 {
-    switch (p) {                                     /* (0.16: the master compressor) */
+    switch (p) {
+    case VP_BSTYLE: put_str(b, bg_style_names[v < BG_STYLES ? v : 0], n); return;
+    case VP_BPART: put_str(b, EB_STYLE_PART_NAME[v < BG_LANES ? v : 0], n); return;
+    case VP_BSEED: put_int(b, (int32_t)v); return;
+    case VP_BENERGY: case VP_BCOMPLEX: case VP_BCHAOS: case VP_BVAR: case VP_BANCHOR:
+        put_int(b, (int32_t)v);
+        put_str(b + str_len(b), "%", n - str_len(b));
+        return;
     case PAR_MC_THR: put_str(put_int(b, -(int32_t)((127u - v) * 48u + 63u) / 127), " dB", 4); return;
     case PAR_MC_ATK: {
         uint32_t tq = (uint32_t)(((uint64_t)289014u * (uint32_t)exp2_q16((int32_t)(v & 127u) * 5143)) >> 16);
@@ -1851,7 +1866,7 @@ static void draw_card(uint32_t k, uint32_t p)
     uint16_t bg = T_SURF, fg = T_TEXT;
     int32_t x0 = (int32_t)k * 60;
     if (p != VP_NONE && ui.held_step >= 0 && par_lockable(p) && ui.mode != M_STEP) {
-        const pattern_t *sp = shown_pat();
+        const pattern_t *sp = view_pat(ui.track);
         const step_t *st = &sp->step[ui.track][ui.held_step];
         uint32_t d = par_to_autodest(p), hs = (uint32_t)ui.held_step;
         lock = 1;
