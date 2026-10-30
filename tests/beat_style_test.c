@@ -95,7 +95,7 @@ int main(void)
     page_params(pp);
     assert(pp[0] == VP_BSTYLE && pp[1] == VP_BPART &&
            pp[2] == VP_BENERGY && pp[3] == VP_BSEED);
-    assert(mode_pages() == 11u && PG_ACTION == 1u && PG_LINKS == 7u);
+    assert(mode_pages() == 11u && PG_ACTION == 2u && PG_LINKS == 9u);
     vp_set(VP_BSTYLE, BG_JTECHNO);
     vp_set(VP_BPART, BG_KICK);
     vp_set(VP_BENERGY, 70);

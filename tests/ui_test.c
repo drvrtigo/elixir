@@ -59,6 +59,17 @@ static void fx_goto(uint32_t g)                      /* 0.16: FX's page g (FXPG_
     for (i = 0; i < 8u && fx_page() != g; i++)
         turn(EN_SELECT, fx_page() < g ? 1 : -1);
 }
+/* Navigate by semantic page ID, through real SELECT detents. */
+static void gen_goto(uint32_t page)
+{
+    uint32_t i;
+    check(ui.mode == M_EUCLID && page < NEUCLID, "generator navigation: valid mode and page");
+    if (ui.mode != M_EUCLID || page >= NEUCLID)
+        return;
+    for (i = 0; i < NEUCLID && ui.page != page; i++)
+        turn(EN_SELECT, ui.page < page ? 1 : -1);
+    check(ui.page == page, "generator navigation: requested page reached");
+}
 static void goto_mode(uint32_t b, uint32_t m)        /* press b until the mode is m */
 {
     uint32_t i;
@@ -711,7 +722,9 @@ static void phase4(void)
     black(0);
     press(B_ARP);
     press(B_ARP);
-    check(ui.mode == M_EUCLID && ui.page == PG_GEN, "ARP twice: GENERATOR");
+    check(ui.mode == M_EUCLID && ui.page == PG_BSTYLE, "ARP twice: STYLE first");
+    gen_goto(PG_GEN);
+    check(ui.mode == M_EUCLID && ui.page == PG_GEN, "SELECT: GENERATOR");
     turn(EN_K1, 2);
     check(p->gen[0][0] == GEN_MUTATE, "GENERATOR: MUTATE");
     turn(EN_K2, 75);
@@ -724,7 +737,7 @@ static void phase4(void)
     shot("mutated");
     {
         uint16_t live = gpat.main[0][0];
-        turn(EN_SELECT, 1);
+        gen_goto(PG_ACTION);
         check(ui.page == PG_ACTION && vp_max(VP_ACTION) == 3, "ACTION: a live generator's COMMIT, UNDO, RESET");
         turn(EN_K1, 1);
         check(ui.action == ACT_COMMIT, "ACTION: COMMIT");
@@ -736,11 +749,11 @@ static void phase4(void)
         press(B_OCTUP);
         check(p->main[0][0] == 0x1111u, "UNDO: the pattern as it was before COMMIT");
         /* DICE (EUCLID's): its hits anywhere over its length; UNDO */
-        turn(EN_SELECT, -1);
+        gen_goto(PG_GEN);
         turn(EN_K1, -1);
         check(p->gen[0][0] == GEN_EUCLID && p->main[0][0] == 0x1111u, "GENERATOR: EUCLID, the steps as they were");
         p->gen[0][2] = 5;
-        turn(EN_SELECT, 1);
+        gen_goto(PG_ACTION);
         check(vp_max(VP_ACTION) == 2, "ACTION: EUCLID's DICE, UNDO");
         turn(EN_K1, 1);
         check(ui.action == ACT_DICE, "ACTION: DICE");
@@ -751,7 +764,7 @@ static void phase4(void)
         turn(EN_K1, 2);
         press(B_OCTUP);
         check(p->main[0][0] == 0x1111u, "UNDO after DICE");
-        turn(EN_SELECT, -1);
+        gen_goto(PG_GEN);
     }
     /* CELLULAR, rule 90, from a cell: the next rows */
     p->gen[0][0] = GEN_CA;
@@ -958,7 +971,7 @@ static void phase5a(void)
     shot("step-bounce");
     press(B_SEQ);
     goto_mode(B_ARP, M_EUCLID);
-    turn(EN_SELECT, (int32_t)PG_BOUNCE);
+    gen_goto(PG_BOUNCE);
     turn(EN_K1, 1);
     turn(EN_K2, -5);
     check((p->bnc[0] & 3u) == 2u && (p->bnc[0] >> 2) == 7u, "BOUNCE: from 1/16, -5 semitones");
@@ -1699,8 +1712,9 @@ static void grids_test(void)
     black(5);
     goto_mode(B_ARP, M_PERF);
     press(B_ARP);
+    gen_goto(PG_GEN);
     shot("grids-generator");
-    turn(EN_SELECT, 1);
+    gen_goto(PG_ACTION);
     {
         uint16_t pp[4];
         page_params(pp);
@@ -1738,10 +1752,11 @@ static void phase14(void)
     black(0);
     /* 14d: Euclid's second pulse, on the ACTION page; joined OR, XOR, AND, SUB */
     goto_mode(B_ARP, M_EUCLID);
+    gen_goto(PG_GEN);
     turn(EN_K1, 1);
     turn(EN_K3, 4);
     check(p->gen[0][0] == GEN_EUCLID && p->main[0][0] == 0x1111u, "EUCLID: 4 hits");
-    turn(EN_SELECT, 1);
+    gen_goto(PG_ACTION);
     page_params(pp);
     title_text(b, sizeof b, &pg, &np);
     check(pp[1] == VP_EH2 && pp[2] == VP_ER2 && pp[3] == VP_EOP && !strcmp(b, "ACTION / EUCLID 2"),
@@ -2483,7 +2498,9 @@ static void phase11(void)
         main_set(p, 0, i, 1);
     p->len[0] = 12;
     goto_mode(B_ARP, M_EUCLID);
-    check(ui.page == PG_GEN, "ARP twice: the GENERATOR page first");
+    check(ui.page == PG_BSTYLE, "ARP twice: the STYLE page first");
+    gen_goto(PG_GEN);
+    check(ui.page == PG_GEN, "SELECT: the GENERATOR page");
     page_params(pp);
     check(pp[0] == VP_GMODE && pp[1] == VP_NONE, "GENERATOR OFF: only the type");
     turn(EN_K1, 1);
@@ -2511,7 +2528,7 @@ static void phase11(void)
         check(p->gen[0][0] == GEN_MUTATE && gpat.main[0][0] == e, "MUTATE after EUCLID: its live track the Euclid steps");
     }
     /* 11d, 11e: the ACTION page, the actions by type; the map only with GRIDS */
-    turn(EN_SELECT, 1);
+    gen_goto(PG_ACTION);
     page_params(pp);
     check(pp[0] == VP_ACTION && pp[1] == VP_NONE, "ACTION: no map without GRIDS");
     turn(EN_K1, 1);
@@ -2521,7 +2538,7 @@ static void phase11(void)
     check(ui.action == ACT_NONE, "another track: no action picked");
     check(vp_max(VP_ACTION) == 1, "a track with no generator: UNDO alone");
     black(0);
-    turn(EN_SELECT, -1);
+    gen_goto(PG_GEN);
     turn(EN_K1, -5);
     check(p->gen[0][0] == GEN_OFF, "GENERATOR: OFF");
     /* 11f: the directions, over 4 steps */
@@ -2597,7 +2614,7 @@ static void phase11(void)
     seq_clear_track(0, p);
     /* the TRACK page's direction; project version 8 */
     goto_mode(B_ARP, M_EUCLID);
-    turn(EN_SELECT, (int32_t)PG_TRACK);
+    gen_goto(PG_TRACK);
     page_params(pp);
     check(pp[0] == PAR_TRACK_LENGTH && pp[1] == VP_CLOCK && pp[2] == VP_DIR, "TRACK: length, clock, direction");
     turn(EN_K3, -10);
@@ -3080,9 +3097,7 @@ static void phase19(void)
           "scale_q: CHROMATIC as it is, WHOLE TONE, FIFTHS");
     check(p->scale == SC_CHROM && p->sfollow == SFOLLOW_DEFAULT, "a new pattern: CHROMATIC, D1-D3 follow");
     goto_mode(B_ARP, M_EUCLID);
-    while (ui.page)
-        turn(EN_SELECT, -1);
-    turn(EN_SELECT, (int32_t)PG_SCALE);
+    gen_goto(PG_SCALE);
     page_params(pp);
     title_text(b, sizeof b, &pg, &np);
     check(pp[0] == VP_SROOT && pp[1] == VP_SCALE && pp[2] == VP_SFOLLOW, "EUCLID: the SCALE page, ROOT SCALE FOLLOW");
@@ -3324,9 +3339,7 @@ static void phase20(void)
     p->sroot = 9;                                    /* A minor pentatonic: A C D E G */
     black(0);
     goto_mode(B_ARP, M_EUCLID);
-    while (ui.page)
-        turn(EN_SELECT, -1);
-    turn(EN_SELECT, (int32_t)PG_MELODY);
+    gen_goto(PG_MELODY);
     page_params(pp);
     title_text(b, sizeof b, &pg, &np);
     check(pp[0] == VP_MEL + ML_SHAPE && pp[3] == VP_MEL + ML_STEPS && !strcmp(b, "MELODY"),
@@ -3419,8 +3432,7 @@ static void phase20(void)
     k = mel_hits(16, nt);
     check(sq.glen[0] > 0u, "LENGTH 1/8: the note held for its length");
     press(B_PLAY);
-    while (ui.page != PG_ACTION)
-        turn(EN_SELECT, -1);
+    gen_goto(PG_ACTION);
     page_params(pp);
     check(pp[0] == VP_ACTION && vp_max(VP_ACTION) == 3, "ACTION with a melody: COMMIT, UNDO, RESET");
     turn(EN_K1, 1);

@@ -318,30 +318,34 @@ static int perf_bank2(void) { return ui.mode == M_PERF && ui.page % NPERF >= PG_
 /* 0.10: ARP's second set of pages: GENERATOR (the type, then its settings: page_params), ACTION (GRIDS: and the
  * map), TRACK, BOUNCE, LINKS, LINK SETUP. 19a: SCALE after TRACK (the pattern's root and scale, the track's
  * follow; TRACK has the follow too). 20: MELODY and MELODY: LOOP after ACTION */
+/* Display order only; saved GEN_* values and pattern data are unchanged. */
 #define NEUCLID 11u
-#define PG_BSTYLE 9u
-#define PG_BDETAIL 10u
-#define PG_GEN 0u
-#define PG_ACTION 1u
-#define PG_MELODY 2u
-#define PG_TRACK 4u
-#define PG_SCALE 5u
-#define PG_BOUNCE 6u
-#define PG_LINKS 7u
-static const uint16_t P_EUCLID[NEUCLID][4] = {{VP_GMODE, VP_GA, VP_GB, VP_GC},
-                                              {VP_ACTION, VP_NONE, VP_NONE, VP_NONE},
-                                              {VP_MEL + ML_SHAPE, VP_MEL + ML_SPREAD, VP_MEL + ML_BIAS, VP_MEL + ML_STEPS},
-                                              {VP_MEL + ML_DEJA, VP_MEL + ML_LOOP, VP_MEL + ML_LEN, VP_MEL + ML_LVAR},
-                                              {PAR_TRACK_LENGTH, VP_CLOCK, VP_DIR, VP_SFOLLOW},
-                                              {VP_SROOT, VP_SCALE, VP_SFOLLOW, VP_NONE},
-                                              {VP_BSTART, VP_BPITCH, VP_NONE, VP_NONE},
-                                              {VP_LINK, VP_LSTART, VP_LAMT, VP_DEPTH},
-                                              {VP_LWHEN, VP_LTGT, VP_LEFF, VP_LWIN},
-                                              {VP_BSTYLE, VP_BPART, VP_BENERGY, VP_BSEED},
-                                              {VP_BCOMPLEX, VP_BCHAOS, VP_BVAR, VP_BANCHOR}};
-static const char *const EUCLID_TITLE[NEUCLID] = {"GENERATOR", "ACTION", "MELODY", "MELODY: LOOP", "TRACK", "SCALE",
-                                                  "BOUNCE", "LINKS", "LINK SETUP",
-                                                  "STYLE: OCT GENERATE", "STYLE DETAIL: OCT"};
+#define PG_BSTYLE 0u
+#define PG_BDETAIL 1u
+#define PG_ACTION 2u
+#define PG_GEN 3u
+#define PG_MELODY 4u
+#define PG_TRACK 6u
+#define PG_SCALE 7u
+#define PG_BOUNCE 8u
+#define PG_LINKS 9u
+static const uint16_t P_EUCLID[NEUCLID][4] = {
+    {VP_BSTYLE, VP_BPART, VP_BENERGY, VP_BSEED},
+    {VP_BCOMPLEX, VP_BCHAOS, VP_BVAR, VP_BANCHOR},
+    {VP_ACTION, VP_NONE, VP_NONE, VP_NONE},
+    {VP_GMODE, VP_GA, VP_GB, VP_GC},
+    {VP_MEL + ML_SHAPE, VP_MEL + ML_SPREAD, VP_MEL + ML_BIAS, VP_MEL + ML_STEPS},
+    {VP_MEL + ML_DEJA, VP_MEL + ML_LOOP, VP_MEL + ML_LEN, VP_MEL + ML_LVAR},
+    {PAR_TRACK_LENGTH, VP_CLOCK, VP_DIR, VP_SFOLLOW},
+    {VP_SROOT, VP_SCALE, VP_SFOLLOW, VP_NONE},
+    {VP_BSTART, VP_BPITCH, VP_NONE, VP_NONE},
+    {VP_LINK, VP_LSTART, VP_LAMT, VP_DEPTH},
+    {VP_LWHEN, VP_LTGT, VP_LEFF, VP_LWIN}
+};
+static const char *const EUCLID_TITLE[NEUCLID] = {
+    "STYLE: OCT GENERATE", "STYLE DETAIL: OCT", "ACTION", "GENERATOR",
+    "MELODY", "MELODY: LOOP", "TRACK", "SCALE", "BOUNCE", "LINKS", "LINK SETUP"
+};
 /* the GENERATOR knob's order (KNOB 1: the value's index here) */
 static const uint8_t GEN_ORDER[NGEN] = {GEN_OFF, GEN_EUCLID, GEN_MUTATE, GEN_TURING, GEN_CA, GEN_GRIDS};
 /* the actions a track's generator has (the ACTION knob's 1..; 0: none): EUCLID's steps diced, a live generator's
