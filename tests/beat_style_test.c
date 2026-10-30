@@ -199,7 +199,7 @@ int main(void)
     printf("style workspace/config: %zu bytes; handoff plus preview: %zu bytes\n",
            sizeof bt_work + sizeof eb_style_output + sizeof eb_style_rhythm +
            sizeof eb_style_config + sizeof eb_style_initialized,
-           sizeof eb_ho + sizeof eb_pv);
+           sizeof eb_ho + sizeof eb_pv + sizeof eb_pv_extra);
     puts("beat_style_test: ok");
     return 0;
 }

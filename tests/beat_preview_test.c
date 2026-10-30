@@ -231,7 +231,7 @@ int main(void)
     puts("ok emulator project save excludes uncommitted preview and load invalidates it");
 
     printf("preview state: %zu bytes; handoff plus preview: %zu bytes\n",
-           sizeof eb_pv, sizeof eb_pv + sizeof eb_ho);
+           sizeof eb_pv + sizeof eb_pv_extra, sizeof eb_pv + sizeof eb_pv_extra + sizeof eb_ho);
     puts("beat_preview_test: ok");
     return 0;
 }
