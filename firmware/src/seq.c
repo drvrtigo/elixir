@@ -150,6 +150,13 @@ static uint8_t pat_keep = 1;        /* 0.9: a pattern's edits stay when another 
 static uint8_t pat_revert;          /* RELOAD: the playing pattern back as saved, whatever Edits says */
 static pattern_t gpat POOL;         /* the generators' live tracks: track t of it plays when t's generator is on */
 static pattern_t upat POOL;         /* UNDO: a track as it was before DICE, COMMIT, EUCLID (undo_t, undo_p) */
+/* Grouped Kit history shares upat and the exact preview source slots.
+ * A new undo save or reuse of those source slots supersedes this history. */
+static struct {
+    uint32_t epoch;
+    uint8_t pattern, mask;
+} eb_kit_undo RAMBUF;
+static void eb_kit_undo_invalidate(void) { eb_kit_undo.mask = 0; }
 /* 20: the melody's notes as they played, step by step (bit 7: played; COMMIT writes them in), their lengths */
 static uint8_t mel_n[NTRACK][NUM_STEPS] POOL, mel_l[NTRACK][NUM_STEPS] POOL;
 static uint8_t songs[NUM_SONGS][MAX_SONG_LENGTH] POOL;
@@ -1255,6 +1262,7 @@ static void trk_copy(pattern_t *d, const pattern_t *s, uint32_t t)
 }
 #include "gen/beat_handoff.h"
 #include "gen/beat_preview.h"
+#include "gen/beat_kit.h"
 
 static void seq_gen_sync(uint32_t t);
 static void seq_reset_tracks(void)                   /* every track before its first step, its counts from 0 */
@@ -1968,6 +1976,7 @@ static int8_t undo_t = -1;
 static uint8_t undo_p;
 static void seq_undo_save(uint32_t t)
 {
+    eb_kit_undo_invalidate();
     trk_copy(&upat, &pat[sq.active], t);
     undo_t = (int8_t)t;
     undo_p = sq.active;
@@ -2015,6 +2024,8 @@ static void seq_commit(uint32_t t)                   /* COMMIT: the live track i
     memcpy(p->gen[t], g, 4);
     memcpy(p->mel[t], m, NML);
 }
+#include "gen/beat_kit_actions.h"
+
 /* DICE: the track again, at random: Euclid's length, its number of hits anywhere */
 static void seq_dice(uint32_t t)
 {
@@ -2049,6 +2060,7 @@ static void seq_init(void)                           /* seq_init */
     eb_context_changed();
     eb_handoff_init();
     eb_preview_init();
+    eb_kit_undo_invalidate();
     for (i = 0; i < NUM_SONGS; i++)
         for (t = 0; t < MAX_SONG_LENGTH; t++)
             songs[i][t] = SONG_END;

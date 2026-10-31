@@ -11,6 +11,12 @@
 #define POOL                             /* (the firmware: .pool, the big zeroed RAM) */
 #define RAMBUF                           /* (the firmware: .ram_buf, zeroed RAM in RAMTEXT) */
 
+/* Engine-only host harness: execution is single-threaded in each process.
+ * Match the web harness's no-op IRQ abstraction; these are NOT target HAL
+ * implementations and do not simulate interrupt timing or concurrency. */
+static uint32_t irq_save(void) { return 0; }
+static void irq_restore(uint32_t f) { (void)f; }
+
 /* usb.c's MIDI rings, as the firmware has them */
 #define MQ 64u
 static uint32_t midi_in_q[MQ];

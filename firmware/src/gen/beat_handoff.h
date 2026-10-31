@@ -35,9 +35,19 @@ static struct {
     eb_handoff_rhythm_t rhythm;
 } eb_ho POOL;
 
+/* Compact Kit payload; exact guards reuse the seven preview source slots. */
+static struct {
+    volatile uint8_t state;
+    uint8_t pattern;
+    uint32_t epoch;
+    eb_handoff_rhythm_t rhythm[NTRACK];
+} eb_kit RAMBUF;
+static void eb_kit_service(void);
+
 static void eb_handoff_init(void)
 {
     memset(&eb_ho, 0, sizeof eb_ho);
+    memset(&eb_kit, 0, sizeof eb_kit);
 }
 
 /* Zero padding as well as fields, so byte comparison is deterministic. */
@@ -67,7 +77,8 @@ static int eb_handoff_capture(uint32_t t)
     uint32_t f = irq_save();
     const pattern_t *p;
     if (t >= NTRACK || sq.active >= NUM_PATTERN || sq.rec || sq.song_mode ||
-        eb_ho.state == EB_HO_BUILDING || eb_ho.state == EB_HO_READY) {
+        eb_ho.state == EB_HO_BUILDING || eb_ho.state == EB_HO_READY ||
+        eb_kit.state == EB_HO_BUILDING || eb_kit.state == EB_HO_READY) {
         irq_restore(f);
         return 0;
     }
@@ -115,6 +126,7 @@ static void eb_handoff_service(void)
 {
     uint32_t t, k, n;
     const pattern_t *p;
+    eb_kit_service();
     if (eb_ho.state == EB_HO_ACCEPTED &&
         (!eb_context_matches(eb_ho.epoch) || sq.active != eb_ho.pattern)) {
         RING_PUBLISH();

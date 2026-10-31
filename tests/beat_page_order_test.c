@@ -6,9 +6,10 @@
 
 int main(void)
 {
-    static const uint16_t expected[11][4] = {
+    static const uint16_t expected[NEUCLID][4] = {
         {VP_BSTYLE, VP_BPART, VP_BENERGY, VP_BSEED},
         {VP_BCOMPLEX, VP_BCHAOS, VP_BVAR, VP_BANCHOR},
+        {VP_BMAP_D1, VP_BMAP_D2, VP_BMAP_D3, VP_BMAP_CY},
         {VP_ACTION, VP_NONE, VP_NONE, VP_NONE},
         {VP_GMODE, VP_GA, VP_GB, VP_GC},
         {VP_MEL + ML_SHAPE, VP_MEL + ML_SPREAD, VP_MEL + ML_BIAS, VP_MEL + ML_STEPS},
@@ -19,8 +20,8 @@ int main(void)
         {VP_LINK, VP_LSTART, VP_LAMT, VP_DEPTH},
         {VP_LWHEN, VP_LTGT, VP_LEFF, VP_LWIN}
     };
-    static const char *const titles[11] = {
-        "STYLE: OCT GENERATE", "STYLE DETAIL: OCT", "ACTION", "GENERATOR",
+    static const char *const titles[NEUCLID] = {
+        "STYLE: LIVE", "STYLE DETAIL: LIVE", "STYLE MAP", "ACTION", "GENERATOR",
         "MELODY", "MELODY: LOOP", "TRACK", "SCALE", "BOUNCE", "LINKS", "LINK SETUP"
     };
     uint16_t pp[4];
@@ -30,12 +31,13 @@ int main(void)
     web_boot();
     memset(&ui, 0, sizeof ui);
     ui.held_step = -1;
+    ui.bscope = 1; /* retain legacy single-track assertions */
     sq.running = sq.rec = sq.song_mode = 0;
     sq.active = sq.pending = 0;
     kset.pmem = 0;
     mode_set(M_EUCLID);
     assert(ui.page == PG_BSTYLE && PG_BSTYLE == 0u);
-    assert(PG_BDETAIL == 1u && PG_ACTION == 2u && PG_GEN == 3u);
+    assert(PG_BDETAIL == 1u && PG_BMAP == 2u && PG_ACTION == 3u && PG_GEN == 4u);
     puts("ok generator section opens on STYLE with page memory off");
 
     pat[0].gen[0][0] = GEN_TURING;
@@ -45,7 +47,7 @@ int main(void)
         page_params(pp);
         assert(!memcmp(pp, expected[p], sizeof pp));
         title_text(title, sizeof title, &pg, &count);
-        assert(pg == p && count == 11u && !strcmp(title, titles[p]));
+        assert(pg == p && count == NEUCLID && !strcmp(title, titles[p]));
         ui.force = 1;
         ui_draw();
         assert(body_is_grid == (p < PG_LINKS));
@@ -94,7 +96,7 @@ int main(void)
     assert(!eb_preview_on(&pat[0], 0));
     assert(seq_undo(0));
     seq_block();
-    puts("ok generation still requires OCT and ACTION Commit/Undo still work");
+    puts("ok settings defer until UI service; manual OCT and ACTION Commit/Undo still work");
 
     ui.shift = 1;
     button_down(B_SEQ);

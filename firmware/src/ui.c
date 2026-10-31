@@ -55,13 +55,16 @@ enum { VP_BASE = 0x200, VP_NONE = VP_BASE, VP_IO_TYPE, VP_IO_SLOT, VP_NAME_POS, 
        VP_GL, VP_GL_LAST = VP_GL + NGLFO * NGLSET - 1,   /* 0.13: the global LFOs' settings (gls: NGLSET each) */
        VP_P2, VP_P2_LAST = VP_P2 + 7,
        VP_BSTYLE, VP_BPART, VP_BENERGY, VP_BSEED,
-       VP_BCOMPLEX, VP_BCHAOS, VP_BVAR, VP_BANCHOR };
+       VP_BCOMPLEX, VP_BCHAOS, VP_BVAR, VP_BANCHOR,
+       VP_BMAP_D1, VP_BMAP_D2, VP_BMAP_D3, VP_BMAP_CY };
+#define VP_BTARGET VP_BPART /* reuse the former Part control ID; no saved format change */
 /* the ACTION page's action (OCT+ does it); 0.10: those of the track's generator (gen_acts) */
 enum { ACT_NONE, ACT_DICE, ACT_COMMIT, ACT_UNDO, ACT_RESET, NACT };
 
 static struct {
     uint8_t mode;
     uint8_t track, bar, sect, half, page;
+    uint8_t bscope; /* STYLE target: 0 Kit (boot default), 1 selected track */
     uint8_t step;                    /* STEP: the selected step (0..63) */
     uint8_t perf;                    /* the white keys roll (PERF, and the sound pages opened from it) */
     uint8_t kplay;                   /* 0.8: the keys play the track's voice (KEYS, and the sound pages opened from it) */
@@ -319,19 +322,21 @@ static int perf_bank2(void) { return ui.mode == M_PERF && ui.page % NPERF >= PG_
  * map), TRACK, BOUNCE, LINKS, LINK SETUP. 19a: SCALE after TRACK (the pattern's root and scale, the track's
  * follow; TRACK has the follow too). 20: MELODY and MELODY: LOOP after ACTION */
 /* Display order only; saved GEN_* values and pattern data are unchanged. */
-#define NEUCLID 11u
+#define NEUCLID 12u
 #define PG_BSTYLE 0u
 #define PG_BDETAIL 1u
-#define PG_ACTION 2u
-#define PG_GEN 3u
-#define PG_MELODY 4u
-#define PG_TRACK 6u
-#define PG_SCALE 7u
-#define PG_BOUNCE 8u
-#define PG_LINKS 9u
+#define PG_BMAP 2u
+#define PG_ACTION 3u
+#define PG_GEN 4u
+#define PG_MELODY 5u
+#define PG_TRACK 7u
+#define PG_SCALE 8u
+#define PG_BOUNCE 9u
+#define PG_LINKS 10u
 static const uint16_t P_EUCLID[NEUCLID][4] = {
     {VP_BSTYLE, VP_BPART, VP_BENERGY, VP_BSEED},
     {VP_BCOMPLEX, VP_BCHAOS, VP_BVAR, VP_BANCHOR},
+    {VP_BMAP_D1, VP_BMAP_D2, VP_BMAP_D3, VP_BMAP_CY},
     {VP_ACTION, VP_NONE, VP_NONE, VP_NONE},
     {VP_GMODE, VP_GA, VP_GB, VP_GC},
     {VP_MEL + ML_SHAPE, VP_MEL + ML_SPREAD, VP_MEL + ML_BIAS, VP_MEL + ML_STEPS},
@@ -343,7 +348,7 @@ static const uint16_t P_EUCLID[NEUCLID][4] = {
     {VP_LWHEN, VP_LTGT, VP_LEFF, VP_LWIN}
 };
 static const char *const EUCLID_TITLE[NEUCLID] = {
-    "STYLE: OCT GENERATE", "STYLE DETAIL: OCT", "ACTION", "GENERATOR",
+    "STYLE: LIVE", "STYLE DETAIL: LIVE", "STYLE MAP", "ACTION", "GENERATOR",
     "MELODY", "MELODY: LOOP", "TRACK", "SCALE", "BOUNCE", "LINKS", "LINK SETUP"
 };
 /* the GENERATOR knob's order (KNOB 1: the value's index here) */
@@ -354,6 +359,12 @@ static const uint8_t GEN_ORDER[NGEN] = {GEN_OFF, GEN_EUCLID, GEN_MUTATE, GEN_TUR
 static uint32_t gen_acts(const pattern_t *p, uint32_t t, uint8_t out[NGACT])
 {
     uint32_t n = 0, g = p->gen[t][0];
+    if (ui.mode == M_EUCLID && ui.page % NEUCLID == PG_ACTION && !ui.bscope) {
+        if (eb_pv.on) out[n++] = ACT_COMMIT;
+        out[n++] = ACT_UNDO;
+        if (eb_pv.on || eb_kit_work_pending()) out[n++] = ACT_RESET;
+        return n;
+    }
     int live = gen_live(p, t) || mel_on(p, t) || eb_preview_on(p, t);
     if (g == GEN_EUCLID)
         out[n++] = ACT_DICE;
@@ -480,6 +491,8 @@ static void page_params(uint16_t out[4])
             out[3] = PAR_EUKLID_ROTATION;
         } else if (ui.page % NEUCLID == PG_GEN && g == GEN_OFF) {
             out[1] = out[2] = out[3] = VP_NONE;
+        } else if (ui.page % NEUCLID == PG_ACTION && !ui.bscope) {
+            out[1] = VP_BTARGET;
         } else if (ui.page % NEUCLID == PG_ACTION && g == GEN_GRIDS) {   /* (the map: only with GRIDS) */
             out[1] = VP_GX;
             out[2] = VP_GY;
@@ -686,7 +699,7 @@ static uint32_t vp_get(uint32_t p)
     if (eb_preview_step_param(p))
         pt = eb_preview_edit(pt, ui.track);
     switch (p) {
-    case VP_BSTYLE ... VP_BANCHOR: return eb_style_ui_get(p);
+    case VP_BSTYLE ... VP_BMAP_CY: return eb_style_ui_get(p);
     case PAR_TRACK_LENGTH: return track_len(pt, ui.track);
     case PAR_STEP_VOLUME: return sel_step()->volume & STEP_VOLUME_MASK;
     case PAR_STEP_NOTE: return sel_step()->note & 127u;
@@ -842,7 +855,7 @@ static uint32_t vp_max(uint32_t p)
         return hi;
     }
     switch (p) {
-    case VP_BSTYLE ... VP_BANCHOR: return eb_style_ui_max(p);
+    case VP_BSTYLE ... VP_BMAP_CY: return eb_style_ui_max(p);
     case PAR_TRACK_LENGTH: case PAR_EUKLID_LENGTH: return 64;
     case PAR_EUKLID_STEPS: return shown_pat()->gen[ui.track][1] ? shown_pat()->gen[ui.track][1] : 16u;
     case PAR_EUKLID_ROTATION: return (shown_pat()->gen[ui.track][1] ? shown_pat()->gen[ui.track][1] : 16u) - 1u;
@@ -955,7 +968,7 @@ static void vp_set_native(uint32_t p, uint32_t v)
     if (eb_preview_step_param(p))
         pt = eb_preview_edit(pt, ui.track);
     switch (p) {
-    case VP_BSTYLE ... VP_BANCHOR: eb_style_ui_set(p, v); return;
+    case VP_BSTYLE ... VP_BMAP_CY: eb_style_ui_set(p, v); return;
     case PAR_TRACK_LENGTH:
         pt->len[ui.track] = (uint8_t)v;
         if (ui.mode == M_LAST && ui.last_all) {
@@ -2179,6 +2192,10 @@ static void button_down(uint32_t b)
             ui.force = 1;
             return;
         }
+        if (ui.mode == M_EUCLID && ui.page % NEUCLID == PG_BMAP) {
+            ui_message("MAP SET: GENERATE ON STYLE");
+            return;
+        }
         if (ui.mode == M_EUCLID &&
             (ui.page % NEUCLID == PG_BSTYLE || ui.page % NEUCLID == PG_BDETAIL)) {
             eb_style_ui_generate();
@@ -2188,6 +2205,18 @@ static void button_down(uint32_t b)
             static const char *const M[NACT] = {"", "DICED", "COMMITTED", "UNDONE", "RESET"};
             static const char *const NO[NACT] = {"", "", "NO GENERATOR ON", "NOTHING TO UNDO", ""};
             int ok = 1;
+            eb_style_ui_cancel();
+            if (!ui.bscope) {
+                ok = ui.action == ACT_COMMIT ? eb_kit_commit() :
+                     ui.action == ACT_UNDO ? eb_kit_undo_redo() :
+                     ui.action == ACT_RESET ? eb_kit_reset() : 0;
+                ui_message(ok ? (ui.action == ACT_COMMIT ? "KIT COMMITTED" :
+                                 ui.action == ACT_UNDO ? "KIT UNDONE / REDONE" : "KIT RESET") :
+                           "KIT: ACTION BLOCKED OR EMPTY");
+                ui.eu_undo = 0;
+                ui.action = ACT_NONE;
+                return;
+            }
             switch (ui.action) {
             case ACT_DICE: seq_dice(ui.track); break;
             case ACT_COMMIT:
@@ -2471,6 +2500,7 @@ static void ui_input(void)
         if ((n = panel_enc(EN_K1 + k)) != 0 && !ui.ca_ask)
             knob_turn(k, n);
     remote_service();
+    (void)eb_style_live_service();                   /* latest STYLE settings, once per UI pass */
     if (ui.kb_open && fm1_ms - ui.kb_ms > 6000u) {   /* the kit browser closes by itself, nothing loaded */
         ui.kb_open = 0;
         ui.force = 1;

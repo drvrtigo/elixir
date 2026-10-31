@@ -4285,6 +4285,7 @@ int main(int argc, char **argv)
         shots = argv[1];
     web_nor_erase();
     web_boot();
+    ui.bscope = 1; /* legacy native-generator scenarios use single-track scope */
     run_ms(200);
     shot("splash");
     run_ms(1400);

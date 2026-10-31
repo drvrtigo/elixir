@@ -17,6 +17,7 @@ static void fixture(void)
     sq.running = sq.rec = sq.song_mode = sq.gsync = 0;
     memset(&ui, 0, sizeof ui);
     ui.held_step = -1;
+    ui.bscope = 1; /* retain legacy single-track assertions */
     ui.mode = M_EUCLID;
     ui.page = PG_BSTYLE;
     undo_t = -1;
@@ -77,7 +78,9 @@ int main(void)
                     c.energy = energies[e];
                     before = pat[0];
                     make_expected(t, &c);
-                    assert(eb_style_generate(t, &c) == EB_STYLE_QUEUED);
+                    /* Explicit prepared-lane primitive still exercises every
+                     * lane on every destination; mapped public calls are tested separately. */
+                    assert(eb_style_generate_role_context(t, &c, eb_context_capture(), sq.active) == EB_STYLE_QUEUED);
                     assert(eb_ho.state == EB_HO_READY);
                     assert(!memcmp(&before, &pat[0], sizeof before));
                     seq_block();
@@ -95,9 +98,9 @@ int main(void)
     page_params(pp);
     assert(pp[0] == VP_BSTYLE && pp[1] == VP_BPART &&
            pp[2] == VP_BENERGY && pp[3] == VP_BSEED);
-    assert(mode_pages() == 11u && PG_ACTION == 2u && PG_LINKS == 9u);
+    assert(mode_pages() == NEUCLID && PG_ACTION == 3u && PG_LINKS == 10u);
     vp_set(VP_BSTYLE, BG_JTECHNO);
-    vp_set(VP_BPART, BG_KICK);
+    vp_set(VP_BTARGET, 1); /* D1; roles remain backend settings */
     vp_set(VP_BENERGY, 70);
     vp_set(VP_BSEED, 1234);
     assert(vp_get(VP_BSTYLE) == BG_JTECHNO && vp_get(VP_BSEED) == 1234u);
@@ -198,7 +201,7 @@ int main(void)
 
     printf("style workspace/config: %zu bytes; handoff plus preview: %zu bytes\n",
            sizeof bt_work + sizeof eb_style_output + sizeof eb_style_rhythm +
-           sizeof eb_style_config + sizeof eb_style_initialized,
+           sizeof eb_style_config + sizeof eb_style_kit_config + sizeof eb_style_initialized,
            sizeof eb_ho + sizeof eb_pv + sizeof eb_pv_extra);
     puts("beat_style_test: ok");
     return 0;

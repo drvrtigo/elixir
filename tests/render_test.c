@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Elixir host test: render a beat with the init kit (and every voice alone) to WAV, check the levels and that
  * every voice sounds, the clock's tempo and the MIDI clock out.
- *   cc -O2 -I build/gen -I firmware/src tests/render_test.c -o build/render_test && build/render_test build/
+ *   cc -O2 -I build/gen -I firmware/src tests/render_test.c -o build/render_test -lm && build/render_test build/
  * And (0.15) that the output doesn't depend on which voices render first (the second core), and the models' limit;
  * (18b) that the effects' early work changes nothing but the reverb's timing (one block). */
 #include <stdio.h>

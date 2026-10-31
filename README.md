@@ -180,7 +180,7 @@ Projects saved by older versions load in newer ones. Elixir 0.1 had 64 patterns;
 ## Tests
 
 ```sh
-cc -O2 -std=gnu99 -w -I build/gen -I firmware/src -I firmware/hal tests/render_test.c -o build/render_test && build/render_test build/
+cc -O2 -std=gnu99 -w -I build/gen -I firmware/src -I firmware/hal tests/render_test.c -o build/render_test -lm && build/render_test build/
 cc -O1 -std=gnu99 -w -I build/gen -I firmware/src -I firmware/hal tests/ui_test.c -o build/ui_test -lm && build/ui_test build/shots
 ```
 

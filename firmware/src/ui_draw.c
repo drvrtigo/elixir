@@ -144,7 +144,18 @@ static void title_text(char *b, uint32_t n, uint32_t *pg, uint32_t *np)
     }
     case M_PERF: put_str(b, PERF_TITLE[ui.page % NPERF], n); break;
     case M_EUCLID:
-        if (ui.page % NEUCLID == PG_ACTION && ui.action) {   /* 0.10: what OCT+ does, in place of the title */
+        if (ui.page % NEUCLID == PG_BMAP) {
+            put_str(b, "STYLE MAP", n);
+        } else if (!ui.bscope && ui.page % NEUCLID <= PG_ACTION) {
+            if (ui.page % NEUCLID == PG_ACTION && ui.action) {
+                static const char *const A[NACT] = {"", "DICE", "COMMIT", "UNDO", "RESET"};
+                put_str(b, "KIT: OCT+ ", n);
+                put_str(b + str_len(b), A[ui.action < NACT ? ui.action : 0], n - str_len(b));
+            } else {
+                static const char *const T[4] = {"STYLE: KIT", "STYLE DETAIL: KIT", "STYLE MAP", "ACTION: KIT"};
+                put_str(b, T[ui.page % NEUCLID], n);
+            }
+        } else if (ui.page % NEUCLID == PG_ACTION && ui.action) {   /* 0.10: what OCT+ does, in place of the title */
             static const char *const A[NACT] = {"", "DICE", "COMMIT", "UNDO", "RESET"};
             put_str(b, "PRESS OCT+ TO ", n);
             put_str(b + str_len(b), A[ui.action < NACT ? ui.action : 0], n - str_len(b));
@@ -1300,8 +1311,12 @@ static void card_name(char *b, uint32_t n, uint32_t p)
         return;
     }
     switch (p) {
+    case VP_BMAP_D1: put_str(b, "D1 role", n); return;
+    case VP_BMAP_D2: put_str(b, "D2 role", n); return;
+    case VP_BMAP_D3: put_str(b, "D3 role", n); return;
+    case VP_BMAP_CY: put_str(b, "Cym role", n); return;
     case VP_BSTYLE: put_str(b, "Style", n); return;
-    case VP_BPART: put_str(b, "Part", n); return;
+    case VP_BPART: put_str(b, "Target", n); return;
     case VP_BENERGY: put_str(b, "Energy", n); return;
     case VP_BSEED: put_str(b, "Seed", n); return;
     case VP_BCOMPLEX: put_str(b, "Complex", n); return;
@@ -1516,8 +1531,10 @@ static void put_ms(char *b, uint32_t ms10)           /* a time: 0.9 ms, 12 ms, 1
 static void card_value(char *b, uint32_t n, uint32_t p, uint32_t v)
 {
     switch (p) {
+    case VP_BMAP_D1 ... VP_BMAP_CY:
+        put_str(b, EB_STYLE_PART_NAME[v < BG_LANES ? v : 0], n); return;
     case VP_BSTYLE: put_str(b, bg_style_names[v < BG_STYLES ? v : 0], n); return;
-    case VP_BPART: put_str(b, EB_STYLE_PART_NAME[v < BG_LANES ? v : 0], n); return;
+    case VP_BPART: put_str(b, EB_STYLE_TARGET_NAME[v <= NTRACK ? v : 0], n); return;
     case VP_BSEED: put_int(b, (int32_t)v); return;
     case VP_BENERGY: case VP_BCOMPLEX: case VP_BCHAOS: case VP_BVAR: case VP_BANCHOR:
         put_int(b, (int32_t)v);

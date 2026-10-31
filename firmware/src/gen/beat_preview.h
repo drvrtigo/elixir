@@ -4,7 +4,7 @@
 
 /* Independent transient owners of gpat tracks. No saved generator enum.
  * Exact source snapshots are split across existing memory sections to keep
- * the RAM/POOL reserve checks intact. This is not a Kit transaction queue.
+ * the RAM/POOL reserve checks intact. Kit capture also borrows these exact source slots.
  */
 #define EB_PREVIEW_POOL_TRACKS 3u
 static struct {
@@ -71,6 +71,11 @@ static int eb_preview_discard(uint32_t t)
         return 0;
     f = irq_save();
     was = eb_preview_on(&pat[sq.active], t);
+    if (eb_kit.pattern == sq.active &&
+        (eb_kit.state == EB_HO_BUILDING || eb_kit.state == EB_HO_READY)) {
+        RING_PUBLISH();
+        eb_kit.state = EB_HO_REJECTED;
+    }
     eb_pv.on &= (uint8_t)~(1u << t);
     if (eb_ho.track == t && eb_ho.pattern == sq.active &&
         eb_ho.state != EB_HO_IDLE) {
@@ -87,6 +92,7 @@ static void eb_preview_accept(void)
     const eb_handoff_track_t *s = &eb_ho.accepted;
     uint32_t t = eb_ho.track;
     uint8_t keep = eb_pv.pattern == eb_ho.pattern && eb_pv.epoch == eb_ho.epoch ? eb_pv.on : 0u;
+    eb_kit_undo_invalidate();
     eb_pv.on = (uint8_t)(keep & ~(1u << t));
     memcpy(gpat.step[t], s->step, sizeof s->step);
     memcpy(gpat.timing[t], s->timing, sizeof s->timing);

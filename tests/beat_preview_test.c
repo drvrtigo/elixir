@@ -16,6 +16,7 @@ static void fixture(void)
     sq.running = sq.rec = sq.song_mode = sq.gsync = 0;
     memset(&ui, 0, sizeof ui);
     ui.held_step = -1;
+    ui.bscope = 1; /* retain legacy single-track assertions */
     ui.mode = M_STEP;
     kset.accel = 0;
     undo_t = -1;

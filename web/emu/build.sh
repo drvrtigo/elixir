@@ -19,7 +19,7 @@ mkdir -p build/emu/fonts
 # shellcheck disable=SC2086
 emcc ${EMU_OPT:--O2} -ffp-contract=off -std=gnu99 -w ${EMU_CFLAGS:-} $KITS \
     "-DELIXIR_VERSION=\"$VERSION\"" -Ibuild/gen -Ifirmware/src -Ifirmware/hal \
-    --no-entry -sSTANDALONE_WASM -sSTACK_SIZE=1048576 -sINITIAL_MEMORY=33554432 -sFILESYSTEM=0 \
+    --no-entry -sSTANDALONE_WASM -sTOTAL_STACK=1048576 -sINITIAL_MEMORY=33554432 -sFILESYSTEM=0 \
     -o build/emu/elixir.wasm web/emu/elixir_web.c
 sed -e "s/@VERSION@/$VERSION/g" -e "s/@PREVIEW@//g" web/emu/index.html > build/emu/index.html
 sed -e "s/@VERSION@/$VERSION/g" -e "s|@BASE@||g" -e "s|@SITE@|../|g" web/emu/mobile.html > build/emu/mobile.html   # (0.16: phones)
